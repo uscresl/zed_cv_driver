@@ -1,0 +1,10 @@
+<library path="lib/libzed_cv_nodelet">
+
+  <class name="zed_cv_driver/ZedCvNodelet"
+	 type="zed_cv_driver::ZedCvNodelet" base_class_type="nodelet::Nodelet">
+    <description>
+      Zed OpenCV driver nodelet.
+    </description>
+  </class>
+
+</library>
