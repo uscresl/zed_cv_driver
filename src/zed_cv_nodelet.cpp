@@ -187,23 +187,22 @@ exposure_auto_priority (bool)   : default=0 value=0
 
   void devicePoll()
   {
+      cv::Mat frame;
+
       while(!boost::this_thread::interruption_requested())
       {
           if(do_reconfigure_) {
               reconfigure();
               do_reconfigure_ = false;
           }
-          NODELET_INFO("Polling");
+          NODELET_DEBUG("Polling camera");
 
-          cv::Mat frame;
-          //cap_ >> frame;
           cap_.read(frame);
 
           ros::Time t = ros::Time::now();
 
           int w = frame.cols;
           int h = frame.rows;
-
 
           bridge_.encoding = enc::BGR8;
           bridge_.header.stamp = t;
@@ -217,7 +216,7 @@ exposure_auto_priority (bool)   : default=0 value=0
               bridge_.image = frame(cv::Rect(0, 0, w/2, h));
 
               l_it_pub_.publish(*bridge_.toImageMsg(), *l_ci_);
-              NODELET_INFO("Published left");
+              NODELET_DEBUG("Published left");
           }
           if(publish_right_) {
               r_ci_->header.stamp = t;
@@ -228,7 +227,7 @@ exposure_auto_priority (bool)   : default=0 value=0
               bridge_.image = frame(cv::Rect(w/2, 0, w/2, h));
 
               r_it_pub_.publish(*bridge_.toImageMsg(), *r_ci_);
-              NODELET_INFO("Published right");
+              NODELET_DEBUG("Published right");
           }
 
 
