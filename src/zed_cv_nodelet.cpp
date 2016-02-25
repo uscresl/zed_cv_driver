@@ -232,6 +232,8 @@ exposure_auto_priority (bool)   : default=0 value=0
 
 
           updater_.update();
+
+          ros::Duration(0.005).sleep();
       }
   }
 
