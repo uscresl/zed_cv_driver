@@ -19,6 +19,19 @@
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/highgui/highgui.hpp>
 
+#include <boost/format.hpp>
+
+#ifndef USE_ZED_SDK
+#define USE_ZED_SDK 0
+#endif
+
+#if USE_ZED_SDK
+#include <zed/Camera.hpp>
+#endif
+
+using boost::format;
+
+
 namespace zed_cv_driver
 {
     namespace enc = sensor_msgs::image_encodings;
@@ -29,7 +42,7 @@ namespace zed_cv_driver
 class ZedCvNodelet : public nodelet::Nodelet
 {
  public:
-  ZedCvNodelet() {}
+  ZedCvNodelet() : serial(0), fw_version(0) {}
   ~ZedCvNodelet()
   {
       pubThread_->interrupt();
@@ -63,15 +76,15 @@ exposure_auto_priority (bool)   : default=0 value=0
   void reconfigure() {
       int w, h;
 
-      NODELET_INFO("Setting resolution: %s", config_.resolution.c_str());
+      NODELET_INFO("Setting resolution: %s", resolution.c_str());
 
-      if(config_.resolution == "2k") {
+      if(resolution == "2k") {
           w = 4416;
           h = 1242;
-      } else if(config_.resolution == "1080p") {
+      } else if(resolution == "1080p") {
           w = 3840;
           h = 1080;
-      } else if(config_.resolution == "vga") {
+      } else if(resolution == "vga") {
           w = 1280;
           h = 480;
       } else {
@@ -92,6 +105,19 @@ exposure_auto_priority (bool)   : default=0 value=0
       cap_.set(CV_CAP_PROP_FPS, config_.frame_rate);
   }
 
+  void readZedInfo()
+  {
+      #if USE_ZED_SDK
+      sl::zed::Camera *zed;
+      zed = new sl::zed::Camera(static_cast<sl::zed::ZEDResolution_mode> (sl::zed::VGA));
+      zed->init(sl::zed::MODE::NONE, -1, true);
+      // Read ZED serial number, etc.
+      serial = zed->getZEDSerial();
+      fw_version = zed->getZEDFirmware();
+      delete zed;
+      #endif
+  }
+
 
   virtual void onInit()
   {
@@ -106,6 +132,11 @@ exposure_auto_priority (bool)   : default=0 value=0
 
     int device_id;
     pnh.param<int>("device_id", device_id, 0);
+    bool scan_devices = device_id==-1;
+    int max_device_id;
+    pnh.param<int>("max_device_id", max_device_id, 10);
+
+    pnh.param<std::string>("resolution", resolution, "720p");
 
     std::string l_camera_info_url;
     std::string r_camera_info_url;
@@ -117,6 +148,19 @@ exposure_auto_priority (bool)   : default=0 value=0
     pnh.param<std::string>("frame_id_left", l_frame_id_, frame_id_);
     pnh.param<std::string>("frame_id_right", r_frame_id_, frame_id_);
 
+    bool read_zed_info;
+    pnh.param<bool>("read_zed_info", read_zed_info, false);
+
+    pnh.param<int>("serial", serial, serial);
+
+    if(read_zed_info) {
+        readZedInfo();
+    }
+
+    if(scan_devices) {
+        device_id = 0;
+    }
+
     // Try connecting to the camera
     while(!cap_.isOpened() && ros::ok())
     {
@@ -124,26 +168,37 @@ exposure_auto_priority (bool)   : default=0 value=0
       {
         NODELET_INFO("Connecting to camera. Device id: %d", device_id);
         cap_.open(device_id);
-
+        break;
       }
       catch(std::runtime_error& e)
       {
         NODELET_ERROR("%s", e.what());
-        ros::Duration(1.0).sleep(); // sleep for one second each time
+      }
+      if(scan_devices) {
+          device_id++;
+          if(device_id>max_device_id) {
+              device_id = 0;
+              ros::Duration(1.0).sleep(); // sleep for one second each time
+          }
+      } else {
+          ros::Duration(1.0).sleep(); // sleep for one second each time
       }
     }
+
+    std::string l_camera_id = str( format("ZED_%d_left_%s") % serial % resolution );
+    std::string r_camera_id = str( format("ZED_%d_right_%s") % serial % resolution );
 
     srv_ = boost::make_shared <dynamic_reconfigure::Server<zed_cv_driver::ZedConfig> > (pnh);
     dynamic_reconfigure::Server<zed_cv_driver::ZedConfig>::CallbackType f =  boost::bind(&zed_cv_driver::ZedCvNodelet::paramCallback, this, _1, _2);
     srv_->setCallback(f);
 
-    l_cinfo_.reset(new camera_info_manager::CameraInfoManager(lnh, "ZED", l_camera_info_url));
+    l_cinfo_.reset(new camera_info_manager::CameraInfoManager(lnh, l_camera_id, l_camera_info_url));
     l_ci_.reset(new sensor_msgs::CameraInfo(l_cinfo_->getCameraInfo()));
     l_ci_->header.frame_id = l_frame_id_;
     l_it_.reset(new image_transport::ImageTransport(lnh));
     l_it_pub_ = l_it_->advertiseCamera("image_raw", 5);
 
-    r_cinfo_.reset(new camera_info_manager::CameraInfoManager(rnh, "ZED", r_camera_info_url));
+    r_cinfo_.reset(new camera_info_manager::CameraInfoManager(rnh, r_camera_id, r_camera_info_url));
     r_ci_.reset(new sensor_msgs::CameraInfo(r_cinfo_->getCameraInfo()));
     r_ci_->header.frame_id = r_frame_id_;
     r_it_.reset(new image_transport::ImageTransport(rnh));
@@ -244,6 +299,8 @@ exposure_auto_priority (bool)   : default=0 value=0
   cv::VideoCapture cap_;
   cv_bridge::CvImage bridge_;
 
+  std::string resolution;
+
   std::string frame_id_;
   std::string l_frame_id_;
   std::string r_frame_id_;
@@ -268,6 +325,9 @@ exposure_auto_priority (bool)   : default=0 value=0
 
   zed_cv_driver::ZedConfig config_;
   bool do_reconfigure_;
+
+  int serial;
+  int fw_version;
 
 
 };
