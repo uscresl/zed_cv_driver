@@ -103,6 +103,8 @@ exposure_auto_priority (bool)   : default=0 value=0
       cap_.set(CV_CAP_PROP_SATURATION, config_.saturation/8.0);
 
       cap_.set(CV_CAP_PROP_FPS, config_.frame_rate);
+
+      frame_rate_ = frame_rate;
   }
 
   void readZedInfo()
