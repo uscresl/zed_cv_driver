@@ -267,7 +267,7 @@ exposure_auto_priority (bool)   : default=0 value=0
               l_ci_->height = h;
               l_ci_->width = w/2;
 
-              bridge_.header.frame_id;
+              bridge_.header.frame_id = l_frame_id_;
               bridge_.image = frame(cv::Rect(0, 0, w/2, h));
 
               l_it_pub_.publish(*bridge_.toImageMsg(), *l_ci_);
@@ -278,7 +278,7 @@ exposure_auto_priority (bool)   : default=0 value=0
               r_ci_->height = h;
               r_ci_->width = w/2;
 
-              bridge_.header.frame_id;
+              bridge_.header.frame_id = r_frame_id_;
               bridge_.image = frame(cv::Rect(w/2, 0, w/2, h));
 
               r_it_pub_.publish(*bridge_.toImageMsg(), *r_ci_);
