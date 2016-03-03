@@ -130,7 +130,6 @@ exposure_auto_priority (bool)   : default=0 value=0
     pnh.param<bool>("publish_left", publish_left_, true);
     pnh.param<bool>("publish_right", publish_right_, true);
 
-    int device_id;
     pnh.param<int>("device_id", device_id, 0);
     bool scan_devices = device_id==-1;
     int max_device_id;
@@ -204,8 +203,16 @@ exposure_auto_priority (bool)   : default=0 value=0
     r_it_.reset(new image_transport::ImageTransport(rnh));
     r_it_pub_ = r_it_->advertiseCamera("image_raw", 5);
 
+    topic_diagnostic_ = boost::shared_ptr< diagnostic_updater::TopicDiagnostic > (new diagnostic_updater::TopicDiagnostic(
+              "image_raw",
+              updater_,
+              diagnostic_updater::FrequencyStatusParam(&frame_rate_, &frame_rate_, 0.1, 10),
+              diagnostic_updater::TimeStampStatusParam(-0.01, 0.1)));
+
     // Set up diagnostics
-    updater_.setHardwareID("zed");
+    updater_.setHardwareID(str(format("ZED %d") % serial));
+    updater_.add("Device ID", this, &ZedCvNodelet::deviceStatus);
+
 
     volatile bool started = false;
     while(!started)
@@ -223,6 +230,16 @@ exposure_auto_priority (bool)   : default=0 value=0
         ros::Duration(1.0).sleep();
       }
     }
+  }
+
+  void deviceStatus(diagnostic_updater::DiagnosticStatusWrapper& status)
+  {
+    status.summary(0, "ZED is running");
+    status.add("Device ID", device_id);
+    status.add("Serial", serial);
+    status.add("FW Version", fw_version);
+    status.add("Resolution", resolution);
+
   }
 
 
@@ -285,6 +302,7 @@ exposure_auto_priority (bool)   : default=0 value=0
               NODELET_DEBUG("Published right");
           }
 
+          topic_diagnostic_->tick(t);
 
           updater_.update();
 
@@ -318,14 +336,17 @@ exposure_auto_priority (bool)   : default=0 value=0
   sensor_msgs::CameraInfoPtr r_ci_;
 
   diagnostic_updater::Updater updater_;
-  double min_freq_;
-  double max_freq_;
+  boost::shared_ptr<diagnostic_updater::TopicDiagnostic> topic_diagnostic_;
+
+  double frame_rate_;
+
 
   boost::shared_ptr<boost::thread> pubThread_;
 
   zed_cv_driver::ZedConfig config_;
   bool do_reconfigure_;
 
+  int device_id;
   int serial;
   int fw_version;
 
