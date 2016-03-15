@@ -42,7 +42,7 @@ namespace zed_cv_driver
 class ZedCvNodelet : public nodelet::Nodelet
 {
  public:
-  ZedCvNodelet() : serial(0), fw_version(0) {}
+  ZedCvNodelet() : serial("0"), fw_version(0) {}
   ~ZedCvNodelet()
   {
       pubThread_->interrupt();
@@ -114,7 +114,7 @@ exposure_auto_priority (bool)   : default=0 value=0
       zed = new sl::zed::Camera(static_cast<sl::zed::ZEDResolution_mode> (sl::zed::VGA));
       zed->init(sl::zed::MODE::NONE, -1, true);
       // Read ZED serial number, etc.
-      serial = zed->getZEDSerial();
+      serial = str(format("%d") % zed->getZEDSerial());
       fw_version = zed->getZEDFirmware();
       delete zed;
       #endif
@@ -152,7 +152,7 @@ exposure_auto_priority (bool)   : default=0 value=0
     bool read_zed_info;
     pnh.param<bool>("read_zed_info", read_zed_info, false);
 
-    pnh.param<int>("serial", serial, serial);
+    pnh.param<std::string>("serial", serial, serial);
 
     if(read_zed_info) {
         readZedInfo();
@@ -186,8 +186,8 @@ exposure_auto_priority (bool)   : default=0 value=0
       }
     }
 
-    std::string l_camera_id = str( format("ZED_%d_left_%s") % serial % resolution );
-    std::string r_camera_id = str( format("ZED_%d_right_%s") % serial % resolution );
+    std::string l_camera_id = str( format("ZED_%s_left_%s") % serial % resolution );
+    std::string r_camera_id = str( format("ZED_%s_right_%s") % serial % resolution );
 
     srv_ = boost::make_shared <dynamic_reconfigure::Server<zed_cv_driver::ZedConfig> > (pnh);
     dynamic_reconfigure::Server<zed_cv_driver::ZedConfig>::CallbackType f =  boost::bind(&zed_cv_driver::ZedCvNodelet::paramCallback, this, _1, _2);
@@ -212,7 +212,7 @@ exposure_auto_priority (bool)   : default=0 value=0
               diagnostic_updater::TimeStampStatusParam(-0.01, 0.1)));
 
     // Set up diagnostics
-    updater_.setHardwareID(str(format("ZED %d") % serial));
+    updater_.setHardwareID(str(format("ZED %s") % serial));
     updater_.add("Device ID", this, &ZedCvNodelet::deviceStatus);
 
 
@@ -349,7 +349,7 @@ exposure_auto_priority (bool)   : default=0 value=0
   bool do_reconfigure_;
 
   int device_id;
-  int serial;
+  std::string serial;
   int fw_version;
 
 
